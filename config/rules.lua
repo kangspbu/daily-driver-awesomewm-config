@@ -52,11 +52,11 @@ awful.rules.rules = {
 
     -- Application-specific rules
     { rule = { class = "Brave" }, 
-      properties = { screen = 1, tag = "Browser", switch_to_tags = true } },
+      properties = { screen = 1, tag = _G.tags.browser, switch_to_tags = true } },
     { rule = { class = "St" }, 
-      properties = { screen = 1, tag = "Settings", switch_to_tags = true } },
+      properties = { screen = 1, tag = _G.tags.config, switch_to_tags = true } },
     { rule = { class = "Code" }, 
-      properties = { screen = 1, tag = "Work", switch_to_tags = true } },
+      properties = { screen = 1, tag = _G.tags.code, switch_to_tags = true } },
       -- Rule-based modal centering for Awesome WM
 	-- Add this rule to your awful.rules.rules table in rc.lua
 

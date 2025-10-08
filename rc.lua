@@ -42,6 +42,16 @@ do
     end)
 end
 
+
+
+
+_G.tags = {
+    browser      = " ",
+    code     = " ",
+    config        = " ",
+}
+
+
 -- ============================================================================
 -- LOAD MODULES (ORDER MATTERS!)
 -- ============================================================================
@@ -59,6 +69,8 @@ require("config.rules")
 -- 4. Load signals (needs to be loaded before screen setup)
 require("config.signals")
 
+
+
 -- ============================================================================
 -- SCREEN SETUP
 -- ============================================================================
@@ -68,7 +80,7 @@ awful.screen.connect_for_each_screen(function(s)
     gears.wallpaper.set("#000000")
 
     -- Tags
-    awful.tag({ "Browser", "Work", "Settings" }, s, awful.layout.layouts[1])
+    awful.tag({ tags.browser, tags.code, tags.config }, s, awful.layout.layouts[1])
 
     -- Create bar for this screen
     require("ui.bar").create_bar(s)
