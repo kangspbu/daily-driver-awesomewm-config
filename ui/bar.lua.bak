@@ -9,9 +9,7 @@ local widgets = require("ui.widgets")
 
 local bar = {}
 
--- Button configurations (moved to module scope to avoid recreation on each screen)
--- This is the main optimization - these tables are created once at load time
--- instead of being recreated every time create_bar() is called
+-- Button configurations
 local taglist_buttons = gears.table.join(
     awful.button({ }, 1, function(t) t:view_only() end),
     awful.button({ modkey }, 1, function(t)
@@ -48,22 +46,15 @@ local tasklist_buttons = gears.table.join(
     end)
 )
 
--- Cache for layoutbox buttons to avoid recreation
-local layoutbox_buttons = gears.table.join(
-    awful.button({ }, 1, function () awful.layout.inc( 1) end),
-    awful.button({ }, 3, function () awful.layout.inc(-1) end),
-    awful.button({ }, 4, function () awful.layout.inc( 1) end),
-    awful.button({ }, 5, function () awful.layout.inc(-1) end)
-)
-
--- Application name cache to avoid repeated string comparisons
--- This cache persists across widget updates, reducing CPU overhead
-local app_name_cache = setmetatable({}, {__mode = "k"})  -- weak keys for automatic cleanup
-
 function bar.create_bar(s)
     -- Layout box
     s.mylayoutbox = awful.widget.layoutbox(s)
-    s.mylayoutbox:buttons(layoutbox_buttons)  -- Use cached buttons
+    s.mylayoutbox:buttons(gears.table.join(
+        awful.button({ }, 1, function () awful.layout.inc( 1) end),
+        awful.button({ }, 3, function () awful.layout.inc(-1) end),
+        awful.button({ }, 4, function () awful.layout.inc( 1) end),
+        awful.button({ }, 5, function () awful.layout.inc(-1) end)
+    ))
 
     -- Taglist widget
     s.mytaglist = awful.widget.taglist {
@@ -117,29 +108,21 @@ function bar.create_bar(s)
                 layout = wibox.layout.fixed.horizontal,
             },
             layout = wibox.layout.align.horizontal,
-            -- Optimized update_callback with caching
             update_callback = function(self, c, index, objects)
                 local text = c.class or c.name or ""
-                
-                -- Check cache first to avoid repeated string comparisons
-                local display_text = app_name_cache[text]
-                if not display_text then
-                    -- Application aliases - only compute once per unique class
-                    if text == "Brave-browser" then
-                        display_text = "Brave"
-                    elseif text == "St" then
-                        display_text = "Terminal"
-                    else
-                        display_text = text
-                    end
-                    app_name_cache[text] = display_text
+                -- Application aliases
+                if text == "Brave-browser" then
+                    text = "Brave"
+                elseif text == "St" then
+                    text = "Terminal"
                 end
-                
-                self:get_children_by_id('mytext')[1].markup = display_text
+                self:get_children_by_id('mytext')[1].markup = text
             end
         },   
     }
 
+    -- Fixed width tasklist
+    local fixed_tasklist = wibox.container.constraint(s.mytasklist, "exact", 100)
 
     -- Divider widget
     local divider = {
@@ -158,14 +141,14 @@ function bar.create_bar(s)
             layout = wibox.layout.fixed.horizontal,
             s.mylayoutbox,
             s.mytaglist,
-            spacing = 4,
+            spacing = 5,
             divider,
             {
                 widget = wibox.container.margin,
-                left   = 4
+                left   = 8
             },
         },
-        s.mytasklist, -- Middle widget
+        fixed_tasklist, -- Middle widget
         { -- Right widgets
             layout = wibox.layout.fixed.horizontal,
             widgets.clock,
