@@ -1,0 +1,52 @@
+local wibox = require("wibox")
+local gears = require("gears")
+local awful = require("awful")
+
+local audio_widget = {}
+
+-- Constants
+local PACTL_CMD = "pactl get-default-sink"
+local TOGGLE_CMD = "fish -c toggle_audio"
+
+-- Widget
+audio_widget.widget = wibox.widget {
+    widget = wibox.widget.textbox,
+    text = "🔊",
+    font = "FiraCode Nerd Font 14",
+    align = "center",
+    valign = "center",
+}
+
+-- Update function (non-blocking async)
+local function update_audio_icon()
+    awful.spawn.easy_async(
+        {"pactl", "get-default-sink"},
+        function(stdout, stderr, exitreason, exitcode)
+            -- Check command success
+            if exitcode ~= 0 then
+                audio_widget.widget.text = "🔇"  -- Muted/error state
+                return
+            end
+            
+            -- USB devices = external speakers, otherwise headphones/internal
+            audio_widget.widget.text = stdout:match("usb") and "🔊" or "🎧"
+        end
+    )
+end
+
+-- Click handler
+audio_widget.widget:connect_signal("button::press", function(_, _, _, button)
+    if button == 1 then
+        awful.spawn.with_shell(TOGGLE_CMD)
+        -- Debounce update to avoid race condition
+        gears.timer.start_new(0.1, function()
+            update_audio_icon()
+            return false
+        end)
+    end
+end)
+
+-- Initialize
+update_audio_icon()
+
+return audio_widget
