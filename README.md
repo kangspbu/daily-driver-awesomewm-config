@@ -1,1 +1,2 @@
-![Screenshot of a my simple WM](/awewm-ezgif.com-resize.jpg)
+
+![Screenshot of a my simple WM](/penampakan.jpg)
