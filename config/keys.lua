@@ -150,7 +150,11 @@ local layout_keys = gears.table.join(
 -- Application launching keys
 local app_keys = gears.table.join(
     awful.key({ modkey }, "]", function()
-        awful.spawn(browser)
+        awful.spawn(browser_work)
+    end, {description = "open a browser", group = "browser"}),
+
+    awful.key({ modkey }, "[", function()
+    awful.spawn(browser_soos)
     end, {description = "open a browser", group = "browser"}),
 
     awful.key({ modkey }, "\\", function()
