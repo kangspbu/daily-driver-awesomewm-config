@@ -1,52 +1,98 @@
-local wibox = require("wibox")
-local gears = require("gears")
-local awful = require("awful")
+local wibox   = require("wibox")
+local gears   = require("gears")
+local awful   = require("awful")
+local naughty = require("naughty")
 
 local audio_widget = {}
 
--- Constants
-local PACTL_CMD = "pactl get-default-sink"
-local TOGGLE_CMD = "fish -c toggle_audio"
+-- Manual sink names (sesuaikan dengan device kamu)
+local speaker_sink = "alsa_output.pci-0000_05_00.6.analog-stereo"
+local usb_sink     = "alsa_output.usb-Generic_Sound_Blaster_Play__4_WWSB1860104002329l-00.analog-stereo"
 
--- Widget
+-- Widget UI
 audio_widget.widget = wibox.widget {
     widget = wibox.widget.textbox,
-    text = "🔊",
-    font = "FiraCode Nerd Font 14",
-    align = "center",
+    text   = "🔊",
+    font   = "FiraCode Nerd Font 14",
+    align  = "center",
     valign = "center",
 }
 
--- Update function (non-blocking async)
+-- Update icon sesuai sink aktif
 local function update_audio_icon()
-    awful.spawn.easy_async(
-        {"pactl", "get-default-sink"},
-        function(stdout, stderr, exitreason, exitcode)
-            -- Check command success
-            if exitcode ~= 0 then
-                audio_widget.widget.text = "🔇"  -- Muted/error state
-                return
-            end
-            
-            -- USB devices = external speakers, otherwise headphones/internal
-            audio_widget.widget.text = stdout:match("usb") and "🔊" or "🎧"
+    awful.spawn.easy_async({"pactl", "get-default-sink"}, function(stdout)
+        local sink = stdout:match("([^\n]+)") or ""
+        if sink == "" then
+            audio_widget.widget.text = "🔊"   -- error / tidak ada sink
+        elseif sink == speaker_sink then
+            audio_widget.widget.text = "🔊"   -- speaker
+        elseif sink == usb_sink then
+            audio_widget.widget.text = "🎧"   -- usb
+        else
+            audio_widget.widget.text = "🔇"   -- fallback = mute/error
         end
-    )
+    end)
 end
 
--- Click handler
-audio_widget.widget:connect_signal("button::press", function(_, _, _, button)
-    if button == 1 then
-        awful.spawn.with_shell(TOGGLE_CMD)
-        -- Debounce update to avoid race condition
+-- Toggle sink manual
+local function toggle_sink()
+    awful.spawn.easy_async({"pactl", "get-default-sink"}, function(stdout)
+        local current = stdout:match("([^\n]+)") or ""
+        local new_sink = (current == speaker_sink) and usb_sink or speaker_sink
+
+        -- Ganti default sink
+        awful.spawn({"pactl", "set-default-sink", new_sink})
+
+        -- Pindahin semua stream setelah sedikit delay (biar sink siap)
+        gears.timer.start_new(0.05, function()
+            awful.spawn.easy_async({"pactl", "list", "short", "sink-inputs"}, function(out)
+                for line in out:gmatch("[^\r\n]+") do
+                    local id = line:match("^(%d+)")
+                    if id then
+                        awful.spawn({"pactl", "move-sink-input", id, new_sink})
+                    end
+                end
+            end)
+        end)
+        
+        local sink_label = (new_sink == speaker_sink) and "Speaker"
+                or (new_sink == usb_sink) and "USB Headset"
+                or "Unknown 🔇"
+
+		naughty.notify({
+			title = "Audio Device Switched",
+			text  = "Now using: " .. sink_label,
+			timeout = 2,     
+			position = "bottom_right", -- posisi di bawah tengah
+
+		})
+
+        -- Update ikon
         gears.timer.start_new(0.1, function()
             update_audio_icon()
             return false
         end)
-    end
+    end)
+end
+
+-- Klik kiri toggle
+audio_widget.widget:connect_signal("button::press", function(_, _, _, button)
+    if button == 1 then toggle_sink() end
 end)
 
--- Initialize
+-- Subscribe only once
+if not audio_widget._subscribed then
+    audio_widget._subscribed = true
+    awful.spawn.once("pactl subscribe", {
+        stdout = function(line)
+            if line:match("sink") then
+                update_audio_icon()
+            end
+        end
+    })
+end
+
+-- Init
 update_audio_icon()
 
 return audio_widget
