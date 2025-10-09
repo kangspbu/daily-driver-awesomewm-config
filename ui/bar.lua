@@ -1,17 +1,17 @@
-local wibox = require("wibox")
-local awful = require("awful")
-local gears = require("gears")
-local widgets = require("ui.widgets")
+local wibox     = require("wibox")
+local awful     = require("awful")
+local gears     = require("gears")
+local xresources = require("beautiful.xresources")
+local dpi       = xresources.apply_dpi
+local widgets   = require("ui.widgets")
 
 -- ============================================================================
--- WIBAR SETUP
+-- WIBAR SETUP (Optimized)
 -- ============================================================================
 
 local bar = {}
 
--- Button configurations (moved to module scope to avoid recreation on each screen)
--- This is the main optimization - these tables are created once at load time
--- instead of being recreated every time create_bar() is called
+-- Button configurations (cached globally, no recreation per screen)
 local taglist_buttons = gears.table.join(
     awful.button({ }, 1, function(t) t:view_only() end),
     awful.button({ modkey }, 1, function(t)
@@ -40,15 +40,10 @@ local tasklist_buttons = gears.table.join(
     awful.button({ }, 3, function()
         awful.menu.client_list({ theme = { width = 250 } })
     end),
-    awful.button({ }, 4, function ()
-        awful.client.focus.byidx(1)
-    end),
-    awful.button({ }, 5, function ()
-        awful.client.focus.byidx(-1)
-    end)
+    awful.button({ }, 4, function () awful.client.focus.byidx(1) end),
+    awful.button({ }, 5, function () awful.client.focus.byidx(-1) end)
 )
 
--- Cache for layoutbox buttons to avoid recreation
 local layoutbox_buttons = gears.table.join(
     awful.button({ }, 1, function () awful.layout.inc( 1) end),
     awful.button({ }, 3, function () awful.layout.inc(-1) end),
@@ -56,125 +51,145 @@ local layoutbox_buttons = gears.table.join(
     awful.button({ }, 5, function () awful.layout.inc(-1) end)
 )
 
--- Application name cache to avoid repeated string comparisons
--- This cache persists across widget updates, reducing CPU overhead
-local app_name_cache = setmetatable({}, {__mode = "k"})  -- weak keys for automatic cleanup
+-- Application name cache (weak keys = auto cleanup)
+local app_name_cache = setmetatable({}, {__mode = "k"})
+
+local divider = wibox.widget {
+    {
+        widget        = wibox.widget.separator,
+        orientation   = 'vertical',
+        forced_width  = dpi(1),
+    },
+--    right  = dpi(8),   -- kasih jarak ke kanan
+    widget = wibox.container.margin,
+}
 
 function bar.create_bar(s)
     -- Layout box
     s.mylayoutbox = awful.widget.layoutbox(s)
-    s.mylayoutbox:buttons(layoutbox_buttons)  -- Use cached buttons
+    s.mylayoutbox:buttons(layoutbox_buttons)
 
     -- Taglist widget
     s.mytaglist = awful.widget.taglist {
         screen  = s,
         filter  = awful.widget.taglist.filter.all,
         buttons = taglist_buttons, 
-        layout  = {
-            layout  = wibox.layout.fixed.horizontal,
-            spacing = 6,
-        },
+        layout  = wibox.layout.fixed.horizontal,
         widget_template = {
             {
                 {
                     id     = "text_role",
                     widget = wibox.widget.textbox,
                 },
-                left   = 6,
-                right  = 6,
-                top    = 3,
-                bottom = 3,
-                widget = wibox.container.margin,
+                top    = dpi(0),
+        bottom = dpi(0),
+        left   = dpi(8),
+        right  = dpi(8),
+                widget  = wibox.container.margin,
             },
             widget = wibox.container.background,
         }
     }
 
-    -- Tasklist widget
-    s.mytasklist = awful.widget.tasklist {
-        screen  = s,
-        filter  = awful.widget.tasklist.filter.currenttags,
-        buttons = tasklist_buttons,
-        layout  = {
-            spacing = 20,
-            layout  = wibox.layout.fixed.horizontal,
-            spacing_widget = {
-                {
-                    forced_width = 2,
-                    widget       = wibox.widget.separator
-                },
-                valign = 'center',
-                halign = 'center',
-                widget = wibox.container.place,
-            },
+    -- Tasklist widget (optimized with create_callback)
+s.mytasklist = awful.widget.tasklist {
+    screen  = s,
+    filter  = awful.widget.tasklist.filter.currenttags,
+    buttons = tasklist_buttons,
+
+    -- IMPORTANT: layout harus berupa table, bukan fungsi langsung
+    layout = {
+        spacing = dpi(2),
+--spacing_widget = {
+--            {
+--                orientation   = "vertical",
+--                forced_width  = 1,
+--                color         = "#666666",
+--                widget        = wibox.widget.separator,
+--            },
+--            valign = "center",
+--            halign = "center",
+--            widget = wibox.container.place,
+--        },
+        layout  = wibox.layout.fixed.horizontal,
+    },
+
+    widget_template = {
+    {
+        {
+            id     = "mytext",
+            widget = wibox.widget.textbox,
         },
-        widget_template = {
-            {
-                {
-                    id     = 'mytext',
-                    widget = wibox.widget.textbox,
-                },
-                layout = wibox.layout.fixed.horizontal,
-            },
-            layout = wibox.layout.align.horizontal,
-            -- Optimized update_callback with caching
-            update_callback = function(self, c, index, objects)
-                local text = c.class or c.name or ""
-                
-                -- Check cache first to avoid repeated string comparisons
-                local display_text = app_name_cache[text]
-                if not display_text then
-                    -- Application aliases - only compute once per unique class
-                    if text == "Brave-browser" then
-                        display_text = "Brave"
-                    elseif text == "St" then
-                        display_text = "Terminal"
-                    else
-                        display_text = text
-                    end
-                    app_name_cache[text] = display_text
-                end
-                
-                self:get_children_by_id('mytext')[1].markup = display_text
+--        margins = dpi(4),
+        top    = dpi(0),
+        bottom = dpi(0),
+        left   = dpi(8),
+        right  = dpi(8),
+        widget  = wibox.container.margin,
+    },
+    id     = "background_role",   -- WAJIB: biar tasklist bisa render
+    widget = wibox.container.background,
+
+    create_callback = function(self, c, index, objects)
+        self.mytext = self:get_children_by_id("mytext")[1]
+    end,
+
+    update_callback = function(self, c, index, objects)
+        local text = c.class or c.name or ""
+        local display_text = app_name_cache[text]
+        if not display_text then
+            if text == "Brave-browser" then
+                display_text = "Brave"
+            elseif text == "St" then
+                display_text = "Termul"
+            else
+                display_text = text
             end
-        },   
-    }
+            app_name_cache[text] = display_text
+        end
 
+        if self.mytext then
+            self.mytext.markup = display_text
+        end
 
-    -- Divider widget
-    local divider = {
-        widget        = wibox.widget.separator,
-        orientation   = 'vertical',
-        forced_width  = 2,
-    }
+        -- Fokus client: kasih underline tipis
+        if client.focus == c then
+            self.border_color = "#ffffff"
+            self.border_width = 0
+            self.shape = function(cr, width, height)
+                gears.shape.rectangle(cr, width, height)
+                cr:rectangle(0, height-2, width, 2) -- garis bawah
+            end
+        else
+            self.shape = gears.shape.rectangle
+        end
+    end
+},
+
+}
+
 
     -- Create the wibar
-    s.mywibox = awful.wibar({ position = "bottom", screen = s, height = 28 })
+    s.mywibox = awful.wibar({ position = "bottom", screen = s, height = dpi(28) })
 
     -- Setup wibar layout
     s.mywibox:setup {
         layout = wibox.layout.align.horizontal,
-        { -- Left widgets
+        { -- Left
             layout = wibox.layout.fixed.horizontal,
             s.mylayoutbox,
             s.mytaglist,
-            spacing = 4,
             divider,
-            {
-                widget = wibox.container.margin,
-                left   = 4
-            },
         },
-        s.mytasklist, -- Middle widget
-        { -- Right widgets
+        s.mytasklist, -- Middle
+        { -- Right
             layout = wibox.layout.fixed.horizontal,
             widgets.clock,
             widgets.network.widget,
             wibox.widget.systray(),
             widgets.battery,
-            widgets.audio.widget,    
-            widgets.show_desktop.widget,  -- Add at the end like Windows
-
+            widgets.audio,
+            widgets.show_desktop.widget,
         },
     }
 end
