@@ -14,5 +14,6 @@ widgets.battery = require("widgets.battery")
 widgets.network = require("widgets.network")
 widgets.audio = require("widgets.audio")
 widgets.show_desktop = require("widgets.show_desktop")
+widgets.sysmon     = require("widgets.sysmon")
 
 return widgets
