@@ -104,9 +104,9 @@ local function get_cpu_temp()
 end
 
 -- Pre-allocated format strings (eliminates string.format allocations)
-local fmt_cpu = '<span foreground="%s"> 󰻠 %d%%</span>'
-local fmt_ram = '<span foreground="%s"> %d%%</span>'
-local fmt_temp = '<span foreground="%s">󰔄%d°C</span>'
+local fmt_cpu = '<span foreground="%s">  %d%%</span>'
+local fmt_ram = '<span foreground="%s"> %d%%</span>'
+local fmt_temp = '<span foreground="%s">󰔏%d°C</span>'
 local fmt_temp_na = '<span foreground="#888">󰔄 N/A</span>'
 
 -- Create widget
