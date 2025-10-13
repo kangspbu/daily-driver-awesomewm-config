@@ -72,6 +72,42 @@ require("config.signals")
 
 
 -- ============================================================================
+-- GC PROFILER (Silent, logs only)
+-- ============================================================================
+local log_path = os.getenv("HOME") .. "/awesome-gc-profiler.log"
+
+local function log_gc_event(freed_kb, before_kb, after_kb, elapsed_ms)
+    local f = io.open(log_path, "a")
+    if f then
+        f:write(string.format(
+            "[%s] GC freed: %.2f KB | Before: %.2f | After: %.2f | Took: %.2f ms\n",
+            os.date("%H:%M:%S"), freed_kb, before_kb, after_kb, elapsed_ms
+        ))
+        f:close()
+    end
+end
+
+local gears = require("gears")
+
+gears.timer {
+    timeout = 30, -- run every 30 seconds
+    autostart = true,
+    call_now = false,
+    callback = function()
+        local before = collectgarbage("count")
+        local t0 = os.clock()
+        collectgarbage("collect")
+        local after = collectgarbage("count")
+        local freed = before - after
+        local elapsed = (os.clock() - t0) * 1000
+        if freed > 0.1 then
+            log_gc_event(freed, before, after, elapsed)
+        end
+    end
+}
+
+
+-- ============================================================================
 -- SCREEN SETUP
 -- ============================================================================
 
