@@ -50,10 +50,28 @@ awful.rules.rules = {
         }
     }, properties = { floating = true }},
 
+ -- Alacritty floating rule (all instances)
+    {
+  rule = { class = "floating-term" },
+  properties = { 
+      floating = true,
+      ontop = false,
+  },
+  callback = function(c)
+      local s = c.screen
+      local g = s.geometry
+      c.width = g.width / 2
+      c.height = g.height - 28
+      c.x = g.x + g.width / 2  -- move to right half
+      c.y = g.y
+  end,
+},
+
+
     -- Application-specific rules
     { rule = { class = "Brave" }, 
       properties = { screen = 1, tag = _G.tags.browser, switch_to_tags = true } },
-    { rule = { class = "St" }, 
+    { rule = { class = "Alacritty" }, 
       properties = { screen = 1, tag = _G.tags.config, switch_to_tags = true } },
     { rule = { class = "Code" }, 
       properties = { screen = 1, tag = _G.tags.code, switch_to_tags = true } },

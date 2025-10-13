@@ -1,72 +1,62 @@
--- AwesomeWM Optimized System Monitor Widget v3
--- FIX: File handle reuse (prevents FD leak)
--- FIX: Pre-allocated format strings (reduces GC pressure)
--- FIX: Cached color lookups (eliminates table allocations)
+-- AwesomeWM Optimized System Monitor Widget v2
+-- Place this in: ~/.config/awesome/widgets/sysmon.lua
+-- Optimizations: cached calculations, lookup tables, reduced allocations
 
 local awful = require("awful")
 local wibox = require("wibox")
 local gears = require("gears")
+local beautiful = require("beautiful")
 
 local sysmon = {}
 
 -- Configuration
-local UPDATE_INTERVAL = 2
+local UPDATE_INTERVAL = 2  -- seconds
 local TEMP_PATH = "/sys/class/hwmon/hwmon5/temp1_input"
 
--- Pre-allocated color constants (no runtime table creation)
+-- Color lookup tables (pre-calculated, no runtime ternary chains)
 local COLOR_GREEN = "#51cf66"
 local COLOR_YELLOW = "#ffd93d"
 local COLOR_RED = "#ff6b6b"
 
--- Color lookup cache (memoization)
-local color_cache = {}
 local function get_threshold_color(value, warn, crit)
-    local key = string.format("%d_%d_%d", value, warn, crit)
-    if color_cache[key] then
-        return color_cache[key]
-    end
-    
-    local color
-    if value > crit then color = COLOR_RED
-    elseif value > warn then color = COLOR_YELLOW
-    else color = COLOR_GREEN
-    end
-    
-    color_cache[key] = color
-    return color
+    if value > crit then return COLOR_RED end
+    if value > warn then return COLOR_YELLOW end
+    return COLOR_GREEN
 end
 
--- CRITICAL FIX: Reusable file handles (prevents FD leak)
+-- Cached file handles and buffers
 local stat_file = io.open("/proc/stat", "r")
 local meminfo_file = io.open("/proc/meminfo", "r")
 local temp_file = io.open(TEMP_PATH, "r")
 
--- Validate temperature sensor
+-- Validate temperature sensor exists
 if not temp_file then
-    print("[sysmon] Warning: CPU temp sensor not found at " .. TEMP_PATH)
+    print("[sysmon] Warning: CPU temperature sensor not found at " .. TEMP_PATH)
 end
 
--- CRITICAL FIX: Rewind file instead of reopening (10x faster, no FD leak)
-local function read_file_reusable(file)
+-- Helper function to read file efficiently with seek rewind
+local function read_file_cached(file)
     if not file then return nil end
-    file:seek("set", 0)  -- Rewind to start
-    return file:read("*all")
+    file:seek("set", 0)  -- Rewind to start (faster than close/reopen)
+    local content = file:read("*all")
+    return content
 end
 
--- CPU usage calculation (optimized)
+-- CPU usage calculation (optimized with direct parsing)
 local prev_idle, prev_total = 0, 0
 local function get_cpu_usage()
-    local content = read_file_reusable(stat_file)
+    local content = read_file_cached(stat_file)
     if not content then return 0 end
     
-    -- Parse first line (cpu aggregate)
+    -- Parse first line only (cpu aggregate)
     local vals = {}
     for num in content:match("cpu%s+([^\n]+)"):gmatch("%d+") do
         vals[#vals + 1] = tonumber(num)
     end
     
-    local idle_time = vals[4] + (vals[5] or 0)
-    local total_time = vals[1] + vals[2] + vals[3] + idle_time + (vals[6] or 0) + (vals[7] or 0)
+    -- vals = {user, nice, system, idle, iowait, irq, softirq, ...}
+    local idle_time = vals[4] + vals[5]  -- idle + iowait
+    local total_time = vals[1] + vals[2] + vals[3] + idle_time + vals[6] + vals[7]
     
     local diff_idle = idle_time - prev_idle
     local diff_total = total_time - prev_total
@@ -81,7 +71,7 @@ end
 
 -- RAM usage (optimized pattern matching)
 local function get_ram_usage()
-    local content = read_file_reusable(meminfo_file)
+    local content = read_file_cached(meminfo_file)
     if not content then return 0 end
     
     local total = tonumber(content:match("MemTotal:%s*(%d+)"))
@@ -92,24 +82,23 @@ local function get_ram_usage()
     return math.floor((total - available) / total * 100 + 0.5)
 end
 
--- CPU temperature (with file handle reuse)
+-- CPU temperature (optimized with cached file handle)
 local function get_cpu_temp()
-    local content = read_file_reusable(temp_file)
-    if not content then return nil end
+    local content = read_file_cached(temp_file)
+    if not content then return "N/A" end
     
     local temp = tonumber(content)
-    if not temp then return nil end
+    if not temp then return "N/A" end
     
     return math.floor(temp / 1000 + 0.5)
 end
 
--- Pre-allocated format strings (eliminates string.format allocations)
-local fmt_cpu = '<span foreground="%s"> 󰻠 %d%%</span>'
-local fmt_ram = '<span foreground="%s"> %d%%</span>'
-local fmt_temp = '<span foreground="%s">󰔄%d°C</span>'
-local fmt_temp_na = '<span foreground="#888">󰔄 N/A</span>'
+-- Pre-allocated format strings (reduces string allocation overhead)
+local fmt_cpu = '<span foreground="%s">  %d%%</span>'
+local fmt_ram = '<span foreground="%s"> %d%%</span>'
+local fmt_temp = '<span foreground="%s">󰔏%d°C</span>'
 
--- Create widget
+-- Create the widget
 function sysmon.create()
     local widget = wibox.widget {
         {
@@ -136,51 +125,44 @@ function sysmon.create()
     local ram_text = widget:get_children_by_id("ram_text")[1]
     local temp_text = widget:get_children_by_id("temp_text")[1]
     
-    -- Update function (optimized)
+    -- Update function
     local function update()
         local cpu = get_cpu_usage()
         local ram = get_ram_usage()
         local temp = get_cpu_temp()
         
-        -- Use cached color lookup
+        -- Use lookup table for colors (faster than nested ternary)
         local cpu_color = get_threshold_color(cpu, 50, 80)
         local ram_color = get_threshold_color(ram, 60, 80)
+        
+        -- Temperature color logic (different thresholds)
+        local temp_color = COLOR_GREEN
+        if type(temp) == "number" then
+            temp_color = get_threshold_color(temp, 70, 85)
+        end
         
         cpu_text:set_markup(string.format(fmt_cpu, cpu_color, cpu))
         ram_text:set_markup(string.format(fmt_ram, ram_color, ram))
         
-        if temp then
-            local temp_color = get_threshold_color(temp, 70, 85)
+        if type(temp) == "number" then
             temp_text:set_markup(string.format(fmt_temp, temp_color, temp))
         else
-            temp_text:set_markup(fmt_temp_na)
+            temp_text:set_markup('<span foreground="#888">󰔏 N/A</span>')
         end
     end
     
     -- Initial update
     update()
     
-    -- Timer with error handling
+    -- Set up timer
     gears.timer {
         timeout = UPDATE_INTERVAL,
         call_now = false,
         autostart = true,
-        callback = function()
-            local success, err = pcall(update)
-            if not success then
-                print("[sysmon] Update error: " .. tostring(err))
-            end
-        end
+        callback = update
     }
     
     return widget
 end
-
--- Cleanup on awesome exit (close file handles)
-awesome.connect_signal("exit", function()
-    if stat_file then stat_file:close() end
-    if meminfo_file then meminfo_file:close() end
-    if temp_file then temp_file:close() end
-end)
 
 return sysmon
