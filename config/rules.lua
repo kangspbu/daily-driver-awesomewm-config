@@ -41,21 +41,13 @@ awful.rules.rules = {
     {
         rule = { class = "floating-term" },
         properties = {
-            floating = true,
-            ontop = false,
+        floating = true,
+        ontop = false,
+        width = 1075,
+        height = 1572,
+        x = 1485,
+        y = 0
         },
-        callback = function(c)
-            local s = c and c.screen
-            if not (s and s.valid) then return end
-
-            local g = s.geometry
-            c:geometry({
-                width  = g.width / 2,
-                height = g.height - 28,
-                x = g.x + g.width / 2,
-                y = g.y,
-            })
-        end,
     },
 
     -- Application tags (avoid stale global tag refs)
