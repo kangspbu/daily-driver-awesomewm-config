@@ -133,9 +133,9 @@ local tasklist_template = {
 
 function bar.create_bar(s)
     -- Layout box
-    s.mylayoutbox = awful.widget.layoutbox(s)
-    s.mylayoutbox:buttons(layoutbox_buttons)
-
+--    s.mylayoutbox = awful.widget.layoutbox(s)
+--    s.mylayoutbox:buttons(layoutbox_buttons)
+--
     -- Taglist widget
     s.mytaglist = awful.widget.taglist {
         screen          = s,
@@ -170,7 +170,7 @@ function bar.create_bar(s)
         layout = wibox.layout.align.horizontal,
         { -- Left widgets
             layout = wibox.layout.fixed.horizontal,
-            s.mylayoutbox,
+--            s.mylayoutbox,
             s.mytaglist,
             divider,
         },

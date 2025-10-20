@@ -13,6 +13,7 @@ local awful = require("awful")
 local hotkeys_popup = require("awful.hotkeys_popup")
 require("awful.hotkeys_popup.keys")
 local naughty = require("naughty")
+local audio_widget = require("widgets.audio")
 
 local keys = {}
 modkey = "Mod4" -- Global export for other modules
@@ -83,7 +84,14 @@ local function toggle_audio_output()
         local is_speaker = current == AUDIO_DEVICES.speaker
         local new_sink = is_speaker and AUDIO_DEVICES.headphone or AUDIO_DEVICES.speaker
         
-        awful.spawn({"pactl", "set-default-sink", new_sink})
+         awful.spawn.easy_async({"pactl", "set-default-sink", new_sink}, function()
+            -- Update after sink actually changes
+            gears.timer.start_new(0.1, function()
+                audio_widget.update()
+                return false
+            end)
+        end)
+
         naughty.notify({
             title = "Audio Output",
             text = is_speaker and "Switched to Headphone" or "Switched to Speaker",
@@ -99,9 +107,10 @@ end
 -- ============================================================================
 
 local floating_term_cache = nil
+local qt = "quick-term"
 
 client.connect_signal("manage", function(c)
-    if c.class == "floating-term" then
+    if c.class == qt then
         floating_term_cache = c
     end
 end)
@@ -121,7 +130,7 @@ local function toggle_floating_terminal()
         c:emit_signal("request::activate", "key.focus", {raise = true})
         return
     end
-    awful.spawn("alacritty --class floating-term")
+    awful.spawn("alacritty --class ".."quick-term")
 end
 
 -- ============================================================================

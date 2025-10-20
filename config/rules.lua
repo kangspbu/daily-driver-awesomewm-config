@@ -39,14 +39,14 @@ awful.rules.rules = {
 
     -- Floating Alacritty terminal
     {
-        rule = { class = "floating-term" },
+        rule = { class = "quick-term" },
         properties = {
         floating = true,
         ontop = false,
         width = 1075,
         height = 1572,
         x = 1485,
-        y = 0
+        y = 0,
         },
     },
 
