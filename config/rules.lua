@@ -37,7 +37,20 @@ awful.rules.rules = {
         properties = { floating = true },
     },
 
-    -- Floating Alacritty terminal
+    {
+        rule = { class = "Gsimplecal" },
+        properties = {
+            floating = true,
+            ontop = true,
+            placement = function(c)
+                -- Place above top-right wibox
+                awful.placement.bottom_right(c, { margins = { bottom = 28, right = 310 } })
+                end
+        }
+    },
+
+
+        -- Floating Alacritty terminal
     {
         rule = { class = "quick-term" },
         properties = {

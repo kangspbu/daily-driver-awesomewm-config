@@ -165,6 +165,15 @@ function bar.create_bar(s)
         bg       = "#1a1a1a",  -- Explicit bg prevents redraws
     })
 
+    -- Add left-click to open calendar
+    widgets.clock:buttons(
+        gears.table.join(
+            awful.button({}, 1, function()
+                awful.spawn("gsimplecal")
+            end)
+        )
+    )
+
     -- Setup wibar layout
     s.mywibox:setup {
         layout = wibox.layout.align.horizontal,

@@ -10,7 +10,7 @@ local gears = require("gears")
 local sysmon = {}
 
 -- Configuration
-local UPDATE_INTERVAL = 2
+local UPDATE_INTERVAL = 5
 local TEMP_PATH = "/sys/class/hwmon/hwmon5/temp1_input"
 
 -- Pre-allocated color constants (no runtime table creation)
